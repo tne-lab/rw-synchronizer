@@ -76,8 +76,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\RWSynchronized.h" />
-    <ClInclude Include="..\..\..\RWSyncManager.h" />
+    <ClInclude Include="..\..\..\Container.h" />
+    <ClInclude Include="..\..\..\Manager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\Container.ipp">
+      <FileType>Document</FileType>
+    </ClInclude>
+    <ClCompile Include="..\..\..\Manager.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
