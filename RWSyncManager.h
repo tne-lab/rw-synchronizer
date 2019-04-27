@@ -99,6 +99,8 @@ namespace RWSync
         // If it does fail due to existing readers or writers, returns false
         bool reset();
 
+        int getMaxReaders() const;
+
         // Expands maximum simultaneous readers (this involves allocating memory).
         // If the current max readers is already equal to or greater than the
         // input, does nothing.
@@ -186,6 +188,8 @@ namespace RWSync
 
     private:
 
+        int size() const;
+
         // Registers a writer. If a writer already exists,
         // returns false, else returns true. returnWriter should be called to release.
         bool checkoutWriter();
@@ -205,15 +209,14 @@ namespace RWSync
         // only ever be called by the writer.
         void pushWrite();
 
-        std::mutex sizeMutex;
-        std::atomic<int> size;
-
         std::atomic<int> nWriters;
         std::atomic<int> nReaders;
 
         int writerIndex;
 
         std::atomic<int> latest;
+
+        std::mutex sizeMutex; // protects the length of readersOf
 
         // deque is one of the few data structures that can contain atomics
         std::deque<std::atomic<int>> readersOf;

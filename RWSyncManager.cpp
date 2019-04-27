@@ -4,7 +4,7 @@
  *  See attached LICENSE file for more details, or https://opensource.org/licenses/MIT.
  */
 
-#include "Manager.h"
+#include "RWSyncManager.h"
 
 #include <cstdint>
 #include <cassert>
@@ -24,7 +24,6 @@ namespace RWSync
         }
 
         readersOf.resize(maxReaders + 2);
-        size.store(maxReaders + 2, std::memory_order_release);
 
         reset();
     }
@@ -38,11 +37,10 @@ namespace RWSync
             return false;
         }
 
-        int currSize = size.load(std::memory_order_acquire);
-
         writerIndex = 0;
         latest.store(-1, std::memory_order_relaxed);
 
+        int currSize = readersOf.size();
         for (int i = 1; i < currSize; ++i)
         {
             readersOf[i].store(0, std::memory_order_relaxed);
@@ -53,11 +51,17 @@ namespace RWSync
     }
 
 
+    int Manager::getMaxReaders() const
+    {
+        return size() - 2;
+    }
+
+
     void Manager::ensureSpaceForReaders(int newMaxReaders)
     {
         std::lock_guard<std::mutex> sizeGuard(sizeMutex);
 
-        int currMaxReaders = size.load(std::memory_order_acquire) - 2;
+        int currMaxReaders = getMaxReaders();
         if (currMaxReaders >= newMaxReaders)
         {
             return;
@@ -68,8 +72,12 @@ namespace RWSync
         {
             readersOf.emplace_back(0);
         }
+    }
 
-        size.store(newMaxReaders + 2, std::memory_order_release);
+
+    int Manager::size() const
+    {
+        return readersOf.size();
     }
 
 
@@ -99,7 +107,7 @@ namespace RWSync
         int currReaders = 0;
         while (!nReaders.compare_exchange_weak(currReaders, currReaders + 1, std::memory_order_acquire))
         {
-            if (currReaders >= size.load(std::memory_order_relaxed) - 2)
+            if (currReaders >= getMaxReaders())
             {
                 return false;
             }
@@ -124,7 +132,7 @@ namespace RWSync
 
         lockToLock.lock();
 
-        int currMaxReaders = size.load(std::memory_order_acquire) - 2;
+        int currMaxReaders = getMaxReaders();
         int currReaders = 0;
         if (!nReaders.compare_exchange_strong(currReaders, currMaxReaders, std::memory_order_acquire))
         {
@@ -155,6 +163,7 @@ namespace RWSync
         assert(writerIndex != -1);
 
         readersOf[writerIndex].store(0, std::memory_order_relaxed);
+
         // see comment in ReadIndex::getLatest() for memory order explanation
         latest.store(writerIndex, std::memory_order_seq_cst);
 
@@ -164,7 +173,7 @@ namespace RWSync
         // be at least one instance that can be identified to write to next in the following loop.
 
         int newWriterIndex = -1;
-        int currSize = size.load(std::memory_order_acquire);
+        int currSize = size();
         for (int i = 0; i < currSize; ++i)
         {
             if (i == writerIndex) { continue; } // don't overwrite what we just wrote!

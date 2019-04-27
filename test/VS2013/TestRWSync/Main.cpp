@@ -1,7 +1,7 @@
 #include <iostream>
 #include <tchar.h>
 
-#include "../../../Container.h"
+#include "../../../RWSyncContainer.h"
 
 static RWSync::Container<int> syncedInt(3);
 

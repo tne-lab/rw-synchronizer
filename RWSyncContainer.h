@@ -7,7 +7,7 @@
  *  See attached LICENSE file for more details, or https://opensource.org/licenses/MIT.
  */
 
-#include "Manager.h"
+#include "RWSyncManager.h"
 
 #include <memory>
 
@@ -110,6 +110,6 @@ namespace RWSync
     };
 }
 
-#include "Container.ipp"
+#include "RWSyncContainer.ipp"
 
 #endif // RW_SYNCED_H_INCLUDED
