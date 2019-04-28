@@ -1,5 +1,5 @@
-#ifndef RW_SYNCED_H_INCLUDED
-#define RW_SYNCED_H_INCLUDED
+#ifndef RW_SYNC_CONTAINER_H_INCLUDED
+#define RW_SYNC_CONTAINER_H_INCLUDED
 
 /*  
  *  Copyright (C) 2019 Ethan Blackwood
@@ -22,8 +22,16 @@ namespace RWSync
     template<typename T>
     class AbstractContainer
     {
+    protected:
+        AbstractContainer(int maxReaders);
+
+        template<typename... Args>
+        void initialize(Args&&... args);
+
     public:
         AbstractContainer() = delete;
+
+        int getMaxReaders() const;
         
         // Reset to state where no writes have been made.
         // Requires that no readers or writers exist. Returns false if
@@ -39,7 +47,9 @@ namespace RWSync
         class WritePtr
         {
         public:
-            WritePtr(AbstractContainer<T>& o);
+            explicit WritePtr(AbstractContainer<T>& o);
+
+            bool tryToMakeValid();
 
             // verify that we actually have a place to write
             bool isValid() const;
@@ -52,18 +62,23 @@ namespace RWSync
             void pushUpdate();
 
         private:
-            AbstractContainer<T>* owner;
+            AbstractContainer<T>& owner;
             WriteIndex ind;
-            const bool valid;
         };
 
         class ReadPtr
         {
         public:
-            ReadPtr(AbstractContainer<T>& o);
+            explicit ReadPtr(AbstractContainer<T>& o);
+
+            bool tryToMakeValid();
+
+            // check whether this read pointer is registered as a
+            // legitimate reader, i.e. it hasn't been locked out
+            bool isValid() const;
 
             // verify that we actually have something to read
-            bool isValid() const;
+            bool canRead() const;
 
             // check if there's an update available
             bool hasUpdate() const;
@@ -76,23 +91,48 @@ namespace RWSync
             const T* operator->();
 
         private:
-            AbstractContainer<T>* owner;
+            AbstractContainer<T>& owner;
             ReadIndex ind;
-            bool valid;
         };
 
     protected:
-        AbstractContainer(int maxReaders);
-
-        template<typename... Args>
-        void initialize(Args&&... args);
-
-    private:
         std::deque<T> data;
+        std::mutex dataSizeMutex;
         std::unique_ptr<T> original;
         Manager sync;
+    };
 
-        int size;
+    // Fixed-size container
+    template<typename T, int maxReaders = 1>
+    class Container : public AbstractContainer<T>
+    {
+    public:
+        template<typename... Args>
+        Container(Args&&... args);
+    };
+
+    // Dynamic-size container
+    // Requires that T is copyable.
+    template<typename T>
+    class ExpandableContainer : public AbstractContainer<T>
+    {
+    public:
+        // Initially allows 1 reader
+        template<typename... Args>
+        ExpandableContainer(Args&&... args);
+
+        void increaseMaxReadersTo(int nReaders);
+
+        class ReadPtr : public AbstractContainer<T>::ReadPtr
+        {
+        public:
+            // Makes sure there is space for
+            // this read pointer by increasing the max # of readers
+            // if necessary. Note that the pointer could still be
+            // not ready for reading if nothing has been written yet,
+            // so checking isValid is still necessary.
+            explicit ReadPtr(ExpandableContainer<T>& o);
+        };
     };
 
     template<typename T>
@@ -101,15 +141,10 @@ namespace RWSync
     template<typename T>
     using ReadPtr = typename AbstractContainer<T>::ReadPtr;
 
-    template<typename T, int maxReaders = 1>
-    class Container : public AbstractContainer<T>
-    {
-    public:
-        template<typename... Args>
-        Container(Args&&... args);
-    };
+    template<typename T>
+    using GuaranteedReadPtr = typename ExpandableContainer<T>::ReadPtr;
 }
 
 #include "RWSyncContainer.ipp"
 
-#endif // RW_SYNCED_H_INCLUDED
+#endif // RW_SYNC_CONTAINER_H_INCLUDED

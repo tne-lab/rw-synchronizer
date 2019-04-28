@@ -194,14 +194,10 @@ namespace RWSync
     /***** WriteIndex *****/
 
     WriteIndex::WriteIndex(Manager& o)
-        : owner(&o)
-        , valid(o.checkoutWriter())
+        : owner(o)
+        , valid(false)
     {
-        if (!valid)
-        {
-            // just to be sure - if not valid, shouldn't be able to access the manager
-            owner = nullptr;
-        }
+        tryToMakeValid();
     }
 
     
@@ -209,8 +205,19 @@ namespace RWSync
     {
         if (valid)
         {
-            owner->returnWriter();
+            owner.returnWriter();
         }
+    }
+
+
+    bool WriteIndex::tryToMakeValid()
+    {
+        if (!valid)
+        {
+            valid = owner.checkoutWriter();
+        }
+
+        return valid;
     }
 
 
@@ -224,7 +231,7 @@ namespace RWSync
     {
         if (valid)
         {
-            return owner->writerIndex;
+            return owner.writerIndex;
         }
         return -1;
     }
@@ -234,25 +241,17 @@ namespace RWSync
     {
         if (valid)
         {
-            owner->pushWrite();
+            owner.pushWrite();
         }
     }
 
     /***** ReadIndex *****/
 
     ReadIndex::ReadIndex(Manager& o)
-        : owner(&o)
-        , valid(o.checkoutReader())
+        : owner(o)
+        , valid(false)
     {
-        if (valid)
-        {
-            getLatest();
-        }
-        else
-        {
-            // just to be sure - if not valid, shouldn't be able to access the synchronizer
-            owner = nullptr;
-        }
+        tryToMakeValid();
     }
 
 
@@ -261,12 +260,33 @@ namespace RWSync
         if (valid)
         {
             finishRead();
-            owner->returnReader();
+            owner.returnReader();
         }
     }
 
 
+    bool ReadIndex::tryToMakeValid()
+    {
+        if (!valid)
+        {
+            valid = owner.checkoutReader();
+            if (valid)
+            {
+                getLatest();
+            }
+        }
+
+        return valid;
+    }
+
+
     bool ReadIndex::isValid() const
+    {
+        return valid;
+    }
+
+
+    bool ReadIndex::canRead() const
     {
         return valid && index != -1;
     }
@@ -274,7 +294,7 @@ namespace RWSync
 
     bool ReadIndex::hasUpdate() const
     {
-        int newLatest = owner->latest.load(std::memory_order_relaxed);
+        int newLatest = owner.latest.load(std::memory_order_relaxed);
         return valid && newLatest != -1 && newLatest != index;
         // even if the latest is different by the time it's pulled, it won't be
         // the one that this reader is currently reading.
@@ -309,7 +329,7 @@ namespace RWSync
         {
             // decrement reader count for current instance
             // see comment in getLatest()
-            owner->readersOf[index].fetch_sub(1, std::memory_order_seq_cst);
+            owner.readersOf[index].fetch_sub(1, std::memory_order_seq_cst);
         }
         index = -1;
     }
@@ -330,19 +350,19 @@ namespace RWSync
         value and increment the actual latest index (in the context of the current call to pushWrite())
         below, rather than some other index that might otherwise have been the next write index.
         */
-        index = owner->latest.load(std::memory_order_seq_cst);
+        index = owner.latest.load(std::memory_order_seq_cst);
 
         if (index != -1)
         {
             int latestReaders = 0;
-            while (!owner->readersOf[index].compare_exchange_weak(latestReaders, latestReaders + 1,
+            while (!owner.readersOf[index].compare_exchange_weak(latestReaders, latestReaders + 1,
                 std::memory_order_relaxed))
             {
                 if (latestReaders == -1)
                 {
                     // can't read this anymore, it's being written to
                     // another latest must have been designated
-                    index = owner->latest.load(std::memory_order_relaxed);
+                    index = owner.latest.load(std::memory_order_relaxed);
                     assert(index != -1); // should never be -1 again if it wasn't before
                     latestReaders = 0;
                 }

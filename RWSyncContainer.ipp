@@ -15,13 +15,13 @@ namespace RWSync
     template<typename T>
     AbstractContainer<T>::AbstractContainer(int maxReaders)
         : sync  (maxReaders)
-        , size  (maxReaders + 2)
     {}
 
     template<typename T>
     template<typename... Args>
     void AbstractContainer<T>::initialize(Args&&... args)
     {
+        int size = sync.getMaxReaders() + 2;
         for (int i = 0; i < size; ++i)
         {
             data.emplace_back(args...);
@@ -29,6 +29,13 @@ namespace RWSync
 
         // move into original if possible
         original.reset(new T(std::forward<Args>(args)...));
+    }
+
+
+    template<typename T>
+    int AbstractContainer<T>::getMaxReaders() const
+    {
+        return sync.getMaxReaders();
     }
 
 
@@ -49,6 +56,9 @@ namespace RWSync
             return false;
         }
 
+        // make sure we don't start adding more to data while this is happening
+        std::lock_guard<std::mutex> dataSizeLock(dataSizeMutex);
+
         for (T& instance : data)
         {
             f(instance);
@@ -64,28 +74,34 @@ namespace RWSync
 
     template<typename T>
     AbstractContainer<T>::WritePtr::WritePtr(AbstractContainer<T>& o)
-        : owner (&o)
+        : owner (o)
         , ind   (o.sync)
-        , valid (ind.isValid())
     {}
+
+
+    template<typename T>
+    bool AbstractContainer<T>::WritePtr::tryToMakeValid()
+    {
+        return ind.tryToMakeValid();
+    }
 
 
     template<typename T>
     bool AbstractContainer<T>::WritePtr::isValid() const
     {
-        return valid;
+        return ind.isValid();
     }
 
 
     template<typename T>
     T& AbstractContainer<T>::WritePtr::operator*()
     {
-        if (!valid)
+        if (!ind.isValid())
         {
             throw new std::out_of_range("Attempt to access an invalid write pointer");
         }
 
-        return owner->data[ind];
+        return owner.data[ind];
     }
 
     
@@ -106,17 +122,29 @@ namespace RWSync
 
     template<typename T>
     AbstractContainer<T>::ReadPtr::ReadPtr(AbstractContainer<T>& o)
-        : owner (&o)
+        : owner (o)
         , ind   (o.sync)
-        // if the ind is valid, but is equal to -1, this pointer is still invalid (for now)
-        , valid (ind != -1)
     {}
+
+
+    template<typename T>
+    bool AbstractContainer<T>::ReadPtr::tryToMakeValid()
+    {
+        return ind.tryToMakeValid();
+    }
 
 
     template<typename T>
     bool AbstractContainer<T>::ReadPtr::isValid() const
     {
-        return valid;
+        return ind.isValid();
+    }
+
+
+    template<typename T>
+    bool AbstractContainer<T>::ReadPtr::canRead() const
+    {
+        return ind.canRead();
     }
 
 
@@ -131,20 +159,18 @@ namespace RWSync
     void AbstractContainer<T>::ReadPtr::pullUpdate()
     {
         ind.pullUpdate();
-        // in case ind is valid but was equal to -1:
-        valid = ind != -1;
     }
 
 
     template<typename T>
     const T& AbstractContainer<T>::ReadPtr::operator*()
     {
-        if (!valid)
+        if (!canRead())
         {
             throw new std::out_of_range("Attempt to access an invalid read pointer");
         }
 
-        return owner->data[ind];
+        return owner.data[ind];
     }
 
 
@@ -162,5 +188,42 @@ namespace RWSync
         : AbstractContainer<T>(maxReaders)
     {
         initialize(std::forward<Args>(args)...);
+    }
+
+    ////// ExpandableContainer //////
+
+    template<typename T>
+    template<typename... Args>
+    ExpandableContainer<T>::ExpandableContainer(Args&&... args)
+        : AbstractContainer<T>(1)
+    {
+        initialize(std::forward<Args>(args)...);
+    }
+
+
+    template<typename T>
+    void ExpandableContainer<T>::increaseMaxReadersTo(int nReaders)
+    {
+        // step 1: ensure space in data
+        std::lock_guard<std::mutex> dataSizeLock(dataSizeMutex);
+        int newElementsNeeded = nReaders + 2 - data.size();
+        for (int i = 0; i < newElementsNeeded; ++i)
+        {
+            data.push_back(*original);
+        }
+
+        // step 2: allow more readers in sync manager
+        sync.ensureSpaceForReaders(nReaders);
+    }
+
+
+    template<typename T>
+    ExpandableContainer<T>::ReadPtr::ReadPtr(ExpandableContainer<T>& o)
+        : AbstractContainer<T>::ReadPtr(o)
+    {
+        while (!tryToMakeValid())
+        {
+            o.increaseMaxReadersTo(o.getMaxReaders() + 1);
+        }        
     }
 }

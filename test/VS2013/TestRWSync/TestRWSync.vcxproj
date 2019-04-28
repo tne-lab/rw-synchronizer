@@ -76,14 +76,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\Container.h" />
-    <ClInclude Include="..\..\..\Manager.h" />
+    <ClInclude Include="..\..\..\RWSyncContainer.h" />
+    <ClInclude Include="..\..\..\RWSyncManager.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\Container.ipp">
+    <ClInclude Include="..\..\..\RWSyncContainer.ipp">
       <FileType>Document</FileType>
     </ClInclude>
-    <ClCompile Include="..\..\..\Manager.cpp" />
+    <ClCompile Include="..\..\..\RWSyncManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />

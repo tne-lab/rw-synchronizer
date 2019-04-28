@@ -1,5 +1,5 @@
-#ifndef RW_SYNCHRONIZER_H_INCLUDED
-#define RW_SYNCHRONIZER_H_INCLUDED
+#ifndef RW_SYNC_MANAGER_H_INCLUDED
+#define RW_SYNC_MANAGER_H_INCLUDED
 
 /*
  *  Copyright (C) 2019 Ethan Blackwood
@@ -116,6 +116,10 @@ namespace RWSync
 
             ~WriteIndex();
 
+            // tries to claim writer status if we don't have it
+            // already - returns true if the write index is now valid.
+            bool tryToMakeValid();
+
             // is there actually a place to write?
             bool isValid() const;
 
@@ -126,8 +130,8 @@ namespace RWSync
             void pushUpdate();
 
         private:
-            Manager* owner;
-            const bool valid;
+            Manager& owner;
+            bool valid;
         };
 
 
@@ -141,9 +145,16 @@ namespace RWSync
 
             ~ReadIndex();
 
+            // tries to claim reader status if we don't have it
+            // already - returns true if the write index is now valid.
+            bool tryToMakeValid();
+
+            // check whether a reader has been checked out successfully
+            bool isValid() const;
+
             // check whether a reader has been checked out and there
             // has been at least one write.
-            bool isValid() const;
+            bool canRead() const;
 
             // check whether a new write has been pushed
             bool hasUpdate() const;            
@@ -161,7 +172,7 @@ namespace RWSync
             // update index to refer to the latest update
             void getLatest();
 
-            Manager* owner;
+            Manager& owner;
             bool valid;
             int index;
         };
@@ -228,4 +239,4 @@ namespace RWSync
     using ReadIndex = Manager::ReadIndex;
 }
 
-#endif // RW_SYNCHRONIZER_H_INCLUDED
+#endif // RW_SYNC_MANAGER_H_INCLUDED
