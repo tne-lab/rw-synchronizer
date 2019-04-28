@@ -22,13 +22,13 @@ namespace RWSync
     void AbstractContainer<T>::initialize(Args&&... args)
     {
         int size = sync.getMaxReaders() + 2;
-        for (int i = 0; i < size; ++i)
+        for (int i = 0; i < size - 1; ++i)
         {
             data.emplace_back(args...);
         }
 
-        // move into original if possible
-        original.reset(new T(std::forward<Args>(args)...));
+        // move into last element if possible
+        data.emplace_back(std::forward<Args>(args)...);
     }
 
 
@@ -47,8 +47,7 @@ namespace RWSync
 
 
     template<typename T>
-    template<typename UnaryFunction>
-    bool AbstractContainer<T>::map(UnaryFunction f)
+    bool AbstractContainer<T>::map(std::function<void(T&)> f)
     {
         Manager::Lockout lock(sync);
         if (!lock.isValid())
@@ -56,15 +55,10 @@ namespace RWSync
             return false;
         }
 
-        // make sure we don't start adding more to data while this is happening
-        std::lock_guard<std::mutex> dataSizeLock(dataSizeMutex);
-
         for (T& instance : data)
         {
             f(instance);
         }
-
-        f(*original);
 
         return true;
     }
@@ -196,8 +190,10 @@ namespace RWSync
     template<typename... Args>
     ExpandableContainer<T>::ExpandableContainer(Args&&... args)
         : AbstractContainer<T>(1)
+        , original(std::forward<Args>(args)...)
     {
-        initialize(std::forward<Args>(args)...);
+        // copy original to ensure that T is copy-constructible
+        initialize(original);
     }
 
 
@@ -209,11 +205,28 @@ namespace RWSync
         int newElementsNeeded = nReaders + 2 - data.size();
         for (int i = 0; i < newElementsNeeded; ++i)
         {
-            data.push_back(*original);
+            data.push_back(original);
         }
 
         // step 2: allow more readers in sync manager
         sync.ensureSpaceForReaders(nReaders);
+    }
+
+
+    template <typename T>
+    bool ExpandableContainer<T>::map(std::function<void(T&)> f)
+    {
+        // make sure we don't start expanding "data" while this is happening
+        std::lock_guard<std::mutex> dataSizeLock(dataSizeMutex);
+
+        // apply to data
+        if (AbstractContainer<T>::map(f))
+        {
+            // apply to "original"
+            f(original);
+            return true;
+        }
+        return false;
     }
 
 

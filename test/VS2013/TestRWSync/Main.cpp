@@ -47,7 +47,6 @@ int _tmain(int argc, _TCHAR* argv[])
 
     // this should not compile:
     // RWSync::ExpandableContainer<NonCopyable> badContainer(0);
-    // badContainer.increaseMaxReadersTo(2);
 
     // this should work:
     RWSync::Container<NonCopyable, 2> goodContainer(0);

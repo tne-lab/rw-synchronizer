@@ -130,7 +130,7 @@ namespace RWSync
             void pushUpdate();
 
         private:
-            Manager& const owner;
+            Manager& owner;
             bool valid;
         };
 
@@ -172,7 +172,7 @@ namespace RWSync
             // update index to refer to the latest update
             void getLatest();
 
-            Manager& const owner;
+            Manager& owner;
             bool valid;
             int index;
         };
@@ -190,7 +190,7 @@ namespace RWSync
             bool isValid() const;
 
         private:
-            Manager& const owner;
+            Manager& owner;
             std::unique_lock<std::mutex> sizeLock;
             const bool hasReadLock;
             const bool hasWriteLock;

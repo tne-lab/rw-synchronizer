@@ -9,7 +9,7 @@
 
 #include "RWSyncManager.h"
 
-#include <memory>
+#include <functional>
 
 /*
  * Class to actually hold data controlled by a RWSync::Manager.
@@ -41,8 +41,7 @@ namespace RWSync
         // Call a function on each underlying data member.
         // Requires that no readers or writers exist. Returns false if
         // this condition is unmet, true otherwise.
-        template<typename UnaryFunction>
-        bool map(UnaryFunction f);
+        virtual bool map(std::function<void(T&)> f);
 
         class WritePtr
         {
@@ -62,7 +61,7 @@ namespace RWSync
             void pushUpdate();
 
         private:
-            AbstractContainer<T>& const owner;
+            AbstractContainer<T>& owner;
             WriteIndex ind;
         };
 
@@ -91,14 +90,12 @@ namespace RWSync
             const T* operator->();
 
         private:
-            AbstractContainer<T>& const owner;
+            AbstractContainer<T>& owner;
             ReadIndex ind;
         };
 
     protected:
         std::deque<T> data;
-        std::mutex dataSizeMutex;
-        std::unique_ptr<T> original;
         Manager sync;
     };
 
@@ -123,6 +120,8 @@ namespace RWSync
 
         void increaseMaxReadersTo(int nReaders);
 
+        bool map(std::function<void(T&)> f) override;
+
         class ReadPtr : public AbstractContainer<T>::ReadPtr
         {
         public:
@@ -133,6 +132,10 @@ namespace RWSync
             // so checking isValid is still necessary.
             explicit ReadPtr(ExpandableContainer<T>& o);
         };
+
+    private:
+        std::mutex dataSizeMutex;
+        T original; // as in "original copy"
     };
 
     template<typename T>
