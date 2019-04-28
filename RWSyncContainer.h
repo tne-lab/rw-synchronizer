@@ -62,7 +62,7 @@ namespace RWSync
             void pushUpdate();
 
         private:
-            AbstractContainer<T>& owner;
+            AbstractContainer<T>& const owner;
             WriteIndex ind;
         };
 
@@ -91,7 +91,7 @@ namespace RWSync
             const T* operator->();
 
         private:
-            AbstractContainer<T>& owner;
+            AbstractContainer<T>& const owner;
             ReadIndex ind;
         };
 

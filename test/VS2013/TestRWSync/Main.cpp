@@ -3,7 +3,17 @@
 
 #include "../../../RWSyncContainer.h"
 
-static RWSync::ExpandableContainer<int> syncedInt(2);
+class NonCopyable
+{
+public:
+    NonCopyable(int i) : a(i) {}
+    NonCopyable(const NonCopyable&) = delete;
+    NonCopyable& operator=(const NonCopyable&) = delete;
+private:
+    int a;
+};
+
+static RWSync::ExpandableContainer<int> syncedInt(0);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -34,6 +44,13 @@ int _tmain(int argc, _TCHAR* argv[])
 
     char c;
     std::cin >> c;
+
+    // this should not compile:
+    // RWSync::ExpandableContainer<NonCopyable> badContainer(0);
+    // badContainer.increaseMaxReadersTo(2);
+
+    // this should work:
+    RWSync::Container<NonCopyable, 2> goodContainer(0);
 
     return 0;
 }

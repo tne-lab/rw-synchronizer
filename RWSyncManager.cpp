@@ -373,7 +373,7 @@ namespace RWSync
     /***** Manager::Lockout *****/
 
     Manager::Lockout::Lockout(Manager& o)
-        : owner         (&o)
+        : owner         (o)
         , sizeLock      (o.sizeMutex, std::defer_lock)
         , hasReadLock   (o.checkoutAllReaders(sizeLock))
         , hasWriteLock  (o.checkoutWriter())
@@ -385,12 +385,12 @@ namespace RWSync
     {
         if (hasReadLock)
         {
-            owner->returnAllReaders(sizeLock);
+            owner.returnAllReaders(sizeLock);
         }
 
         if (hasWriteLock)
         {
-            owner->returnWriter();
+            owner.returnWriter();
         }
     }
 
