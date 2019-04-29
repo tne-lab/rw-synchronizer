@@ -22,12 +22,6 @@ namespace RWSync
     template<typename T>
     class AbstractContainer
     {
-    protected:
-        AbstractContainer(int maxReaders);
-
-        template<typename... Args>
-        void initialize(Args&&... args);
-
     public:
         AbstractContainer() = delete;
 
@@ -95,6 +89,11 @@ namespace RWSync
         };
 
     protected:
+        AbstractContainer(int maxReaders);
+
+        template<typename... Args>
+        void initialize(Args&&... args);
+
         std::deque<T> data;
         Manager sync;
     };
