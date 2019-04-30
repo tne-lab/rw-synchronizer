@@ -10,49 +10,110 @@
 
 namespace RWSync
 {
-    ////// AbstractContainer //////
-
-    template<typename T>
-    AbstractContainer<T>::AbstractContainer(int maxReaders)
-        : sync  (maxReaders)
-    {}
-
     template<typename T>
     template<typename... Args>
-    void AbstractContainer<T>::initialize(Args&&... args)
+    Container<T>::Container(const Args&... args)
+        : manager       (new Manager())
+        , dataSizeMutex (new std::mutex())
+        , original      (new T(args...))
     {
-        int size = sync.getMaxReaders() + 2;
-        for (int i = 0; i < size - 1; ++i)
+        for (int i = 0; i < 3; ++i)
         {
             data.emplace_back(args...);
         }
-
-        // move into last element if possible
-        data.emplace_back(std::forward<Args>(args)...);
     }
 
 
     template<typename T>
-    int AbstractContainer<T>::getMaxReaders() const
+    template<int maxReaders, typename... Args>
+    Container<T> Container<T>::createWithMaxReaders(const Args&... args)
     {
-        return sync.getMaxReaders();
+        Container<T> container(args...);
+        container.manager->ensureSpaceForReaders(maxReaders);
+
+        // add additional copies
+        for (int i = 1; i < maxReaders; ++i)
+        {
+            container.data.emplace_back(args...);
+        }
+
+        return container; // moves (or constructs in place with RVO)
     }
 
 
     template<typename T>
-    bool AbstractContainer<T>::reset()
+    Container<T>::Container(Container<T>&& other)
+        : manager       (std::move(other.manager))
+        , data          (std::move(other.data))
+        , dataSizeMutex (std::move(other.dataSizeMutex))
+        , original      (std::move(other.original))
+    {}
+
+
+    template<typename T>
+    Container<T>& Container<T>::operator=(Container<T>&& other)
     {
-        return sync.reset();
+        if (this != &other)
+        {
+            manager = std::move(other.manager);
+            data = std::move(other.data);
+            dataSizeMutex = std::move(other.dataSizeMutex);
+            original = std::move(original);
+        }
+        return *this;
     }
 
 
     template<typename T>
-    bool AbstractContainer<T>::map(std::function<void(T&)> f)
+    int Container<T>::getMaxReaders() const
     {
-        Manager::Lockout lock(sync);
+        return manager->getMaxReaders();
+    }
+
+
+    template<typename T>
+    void Container<T>::increaseMaxReadersTo(int nReaders)
+    {
+        static_assert(canExpand, "Only Containers of copy-constructible types can be expanded");
+
+        // step 1: ensure space in data
+        std::lock_guard<std::mutex> dataSizeLock(*dataSizeMutex);
+        int newElementsNeeded = nReaders + 2 - data.size();
+        for (int i = 0; i < newElementsNeeded; ++i)
+        {
+            data.push_back(*original);
+        }
+
+        // step 2: allow more readers in manager manager
+        manager->ensureSpaceForReaders(nReaders);
+    }
+
+
+    template<typename T>
+    bool Container<T>::reset()
+    {
+        return manager->reset();
+    }
+
+
+    template<typename T>
+    bool Container<T>::map(std::function<void(T&)> f)
+    {
+        Manager::Lockout lock(*manager);
         if (!lock.isValid())
         {
             return false;
+        }
+
+        std::unique_lock<std::mutex> dataSizeLock(*dataSizeMutex, std::defer_lock);
+        if (canExpand)
+        {
+            // make sure we don't start expanding "data" while this is happening
+            dataSizeLock.lock();
+
+            // only need to apply to "original" if can expand, since otherwise
+            // it won't be used.
+            f(*original);
         }
 
         for (T& instance : data)
@@ -64,31 +125,29 @@ namespace RWSync
     }
 
 
-    /***** AbstractContainer::WritePtr ******/
-
     template<typename T>
-    AbstractContainer<T>::WritePtr::WritePtr(AbstractContainer<T>& o)
+    Container<T>::WritePtr::WritePtr(Container<T>& o)
         : owner (o)
-        , ind   (o.sync)
+        , ind   (*o.manager)
     {}
 
 
     template<typename T>
-    bool AbstractContainer<T>::WritePtr::tryToMakeValid()
+    bool Container<T>::WritePtr::tryToMakeValid()
     {
         return ind.tryToMakeValid();
     }
 
 
     template<typename T>
-    bool AbstractContainer<T>::WritePtr::isValid() const
+    bool Container<T>::WritePtr::isValid() const
     {
         return ind.isValid();
     }
 
 
     template<typename T>
-    T& AbstractContainer<T>::WritePtr::operator*()
+    T& Container<T>::WritePtr::operator*()
     {
         if (!ind.isValid())
         {
@@ -100,64 +159,63 @@ namespace RWSync
 
     
     template<typename T>
-    T* AbstractContainer<T>::WritePtr::operator->()
+    T* Container<T>::WritePtr::operator->()
     {
         return &(operator*());
     }
 
 
     template<typename T>
-    void AbstractContainer<T>::WritePtr::pushUpdate()
+    void Container<T>::WritePtr::pushUpdate()
     {
         ind.pushUpdate();
     }
 
-    /***** AbstractContainer::WritePtr ******/
 
     template<typename T>
-    AbstractContainer<T>::ReadPtr::ReadPtr(AbstractContainer<T>& o)
+    Container<T>::ReadPtr::ReadPtr(Container<T>& o)
         : owner (o)
-        , ind   (o.sync)
+        , ind   (*o.manager)
     {}
 
 
     template<typename T>
-    bool AbstractContainer<T>::ReadPtr::tryToMakeValid()
+    bool Container<T>::ReadPtr::tryToMakeValid()
     {
         return ind.tryToMakeValid();
     }
 
 
     template<typename T>
-    bool AbstractContainer<T>::ReadPtr::isValid() const
+    bool Container<T>::ReadPtr::isValid() const
     {
         return ind.isValid();
     }
 
 
     template<typename T>
-    bool AbstractContainer<T>::ReadPtr::canRead() const
+    bool Container<T>::ReadPtr::canRead() const
     {
         return ind.canRead();
     }
 
 
     template<typename T>
-    bool AbstractContainer<T>::ReadPtr::hasUpdate() const
+    bool Container<T>::ReadPtr::hasUpdate() const
     {
         return ind.hasUpdate();
     }
 
 
     template<typename T>
-    void AbstractContainer<T>::ReadPtr::pullUpdate()
+    void Container<T>::ReadPtr::pullUpdate()
     {
         ind.pullUpdate();
     }
 
 
     template<typename T>
-    const T& AbstractContainer<T>::ReadPtr::operator*()
+    const T& Container<T>::ReadPtr::operator*()
     {
         if (!canRead())
         {
@@ -169,70 +227,15 @@ namespace RWSync
 
 
     template<typename T>
-    const T* AbstractContainer<T>::ReadPtr::operator->()
+    const T* Container<T>::ReadPtr::operator->()
     {
         return &(operator*());
     }
 
-    ////// Container //////
-
-    template<typename T, int maxReaders>
-    template<typename... Args>
-    Container<T, maxReaders>::Container(Args&&... args)
-        : AbstractContainer<T>(maxReaders)
-    {
-        initialize(std::forward<Args>(args)...);
-    }
-
-    ////// ExpandableContainer //////
 
     template<typename T>
-    template<typename... Args>
-    ExpandableContainer<T>::ExpandableContainer(Args&&... args)
-        : AbstractContainer<T>(1)
-        , original(std::forward<Args>(args)...)
-    {
-        // copy original to ensure that T is copy-constructible
-        initialize(original);
-    }
-
-
-    template<typename T>
-    void ExpandableContainer<T>::increaseMaxReadersTo(int nReaders)
-    {
-        // step 1: ensure space in data
-        std::lock_guard<std::mutex> dataSizeLock(dataSizeMutex);
-        int newElementsNeeded = nReaders + 2 - data.size();
-        for (int i = 0; i < newElementsNeeded; ++i)
-        {
-            data.push_back(original);
-        }
-
-        // step 2: allow more readers in sync manager
-        sync.ensureSpaceForReaders(nReaders);
-    }
-
-
-    template <typename T>
-    bool ExpandableContainer<T>::map(std::function<void(T&)> f)
-    {
-        // make sure we don't start expanding "data" while this is happening
-        std::lock_guard<std::mutex> dataSizeLock(dataSizeMutex);
-
-        // apply to data
-        if (AbstractContainer<T>::map(f))
-        {
-            // apply to "original"
-            f(original);
-            return true;
-        }
-        return false;
-    }
-
-
-    template<typename T>
-    ExpandableContainer<T>::ReadPtr::ReadPtr(ExpandableContainer<T>& o)
-        : AbstractContainer<T>::ReadPtr(o)
+    Container<T>::GuaranteedReadPtr::GuaranteedReadPtr(Container<T>& o)
+        : ReadPtr(o)
     {
         while (!tryToMakeValid())
         {

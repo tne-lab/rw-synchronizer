@@ -15,8 +15,8 @@ namespace RWSync
     ////// Manager ///////
 
     Manager::Manager(int maxReaders)
-        : nReaders      (0)
-        , nWriters      (0)
+        : nReaders(0)
+        , nWriters(0)
     {
         if (maxReaders < 1 || maxReaders > INT_MAX - 2)
         {

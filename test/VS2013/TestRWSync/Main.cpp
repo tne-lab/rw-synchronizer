@@ -1,3 +1,9 @@
+/*
+*  Copyright (C) 2019 Ethan Blackwood
+*  This is free software released under the MIT license.
+*  See attached LICENSE file for more details, or https://opensource.org/licenses/MIT.
+*/
+
 #include <iostream>
 #include <tchar.h>
 
@@ -9,11 +15,12 @@ public:
     NonCopyable(int i) : a(i) {}
     NonCopyable(const NonCopyable&) = delete;
     NonCopyable& operator=(const NonCopyable&) = delete;
+
 private:
     int a;
 };
 
-static RWSync::ExpandableContainer<int> syncedInt(0);
+static RWSync::Container<int> syncedInt(0);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -46,10 +53,11 @@ int _tmain(int argc, _TCHAR* argv[])
     std::cin >> c;
 
     // this should not compile:
-    // RWSync::ExpandableContainer<NonCopyable> badContainer(0);
+    // RWSync::Container<NonCopyable> badContainer(0);
+    // badContainer.increaseMaxReadersTo(2);
 
     // this should work:
-    RWSync::Container<NonCopyable, 2> goodContainer(0);
+    auto goodContainer = RWSync::Container<NonCopyable>::createWithMaxReaders<2>(0);
 
     return 0;
 }

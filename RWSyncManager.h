@@ -7,8 +7,6 @@
  *  See attached LICENSE file for more details, or https://opensource.org/licenses/MIT.
  */
 
-#include <cstdlib>
-
 #include <atomic>
 #include <mutex>
 #include <deque>
@@ -91,9 +89,6 @@ namespace RWSync
     public:
         explicit Manager(int maxReaders = 1);
 
-        Manager(const Manager&) = delete;
-        Manager& operator=(const Manager&) = delete;
-
         // Reset to state with no valid object
         // No readers or writers should be active when this is called!
         // If it does fail due to existing readers or writers, returns false
@@ -110,9 +105,6 @@ namespace RWSync
         {
         public:
             explicit WriteIndex(Manager& o);
-
-            WriteIndex(const WriteIndex&) = delete;
-            WriteIndex& operator=(const WriteIndex&) = delete;
 
             ~WriteIndex();
 
@@ -139,9 +131,6 @@ namespace RWSync
         {
         public:
             explicit ReadIndex(Manager& o);                
-
-            ReadIndex(const ReadIndex&) = delete;
-            ReadIndex& operator=(const ReadIndex&) = delete;
 
             ~ReadIndex();
 
