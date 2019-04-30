@@ -12,6 +12,7 @@
 #include <functional>
 #include <type_traits>
 #include <memory>
+#include <vector>
 
 /*
  * Class to actually hold data controlled by a RWSync::Manager.
@@ -123,7 +124,7 @@ namespace RWSync
 
         std::unique_ptr<Manager> manager;
 
-        std::deque<T> data;
+        std::vector<std::unique_ptr<T>> data;
         std::unique_ptr<std::mutex> dataSizeMutex;
 
         std::unique_ptr<T> original; // as in "original copy"

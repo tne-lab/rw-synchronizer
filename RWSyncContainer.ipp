@@ -17,9 +17,10 @@ namespace RWSync
         , dataSizeMutex (new std::mutex())
         , original      (new T(args...))
     {
+        data.reserve(3);
         for (int i = 0; i < 3; ++i)
         {
-            data.emplace_back(args...);
+            data.emplace_back(new T(args...));
         }
     }
 
@@ -32,9 +33,10 @@ namespace RWSync
         container.manager->ensureSpaceForReaders(maxReaders);
 
         // add additional copies
+        container.data.reserve(maxReaders + 2);
         for (int i = 1; i < maxReaders; ++i)
         {
-            container.data.emplace_back(args...);
+            container.data.emplace_back(new T(args...));
         }
 
         return container; // moves (or constructs in place with RVO)
@@ -43,11 +45,9 @@ namespace RWSync
 
     template<typename T>
     Container<T>::Container(Container<T>&& other)
-        : manager       (std::move(other.manager))
-        , data          (std::move(other.data))
-        , dataSizeMutex (std::move(other.dataSizeMutex))
-        , original      (std::move(other.original))
-    {}
+    {
+        *this = std::move(other);
+    }
 
 
     template<typename T>
@@ -55,10 +55,10 @@ namespace RWSync
     {
         if (this != &other)
         {
-            manager = std::move(other.manager);
-            data = std::move(other.data);
-            dataSizeMutex = std::move(other.dataSizeMutex);
-            original = std::move(original);
+            manager         = std::move(other.manager);
+            data            = std::move(other.data);
+            dataSizeMutex   = std::move(other.dataSizeMutex);
+            original        = std::move(other.original);
         }
         return *this;
     }
@@ -81,7 +81,7 @@ namespace RWSync
         int newElementsNeeded = nReaders + 2 - data.size();
         for (int i = 0; i < newElementsNeeded; ++i)
         {
-            data.push_back(*original);
+            data.emplace_back(new T(*original));
         }
 
         // step 2: allow more readers in manager manager
@@ -116,9 +116,9 @@ namespace RWSync
             f(*original);
         }
 
-        for (T& instance : data)
+        for (std::unique_ptr<T>& instance : data)
         {
-            f(instance);
+            f(*instance);
         }
 
         return true;
@@ -149,19 +149,19 @@ namespace RWSync
     template<typename T>
     T& Container<T>::WritePtr::operator*()
     {
-        if (!ind.isValid())
-        {
-            throw new std::out_of_range("Attempt to access an invalid write pointer");
-        }
-
-        return owner.data[ind];
+        return *(operator->());
     }
 
     
     template<typename T>
     T* Container<T>::WritePtr::operator->()
     {
-        return &(operator*());
+        if (!ind.isValid())
+        {
+            throw new std::out_of_range("Attempt to access an invalid write pointer");
+        }
+
+        return owner.data[ind];
     }
 
 
@@ -217,19 +217,19 @@ namespace RWSync
     template<typename T>
     const T& Container<T>::ReadPtr::operator*()
     {
-        if (!canRead())
-        {
-            throw new std::out_of_range("Attempt to access an invalid read pointer");
-        }
-
-        return owner.data[ind];
+        return *(operator->());
     }
 
 
     template<typename T>
     const T* Container<T>::ReadPtr::operator->()
     {
-        return &(operator*());
+        if (!canRead())
+        {
+            throw new std::out_of_range("Attempt to access an invalid read pointer");
+        }
+
+        return owner.data[ind];
     }
 
 
