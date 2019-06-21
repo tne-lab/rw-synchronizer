@@ -7,6 +7,7 @@
 #include "RWSyncManager.h"
 
 #include <cstdint>
+#include <climits>
 #include <cassert>
 #include <exception>
 
