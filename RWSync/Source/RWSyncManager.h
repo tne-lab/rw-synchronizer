@@ -11,9 +11,20 @@
 #include <mutex>
 #include <deque>
 
+#ifdef OEPLUGIN
+#define OPEN_EPHYS
+#endif
+
+#ifdef OPEN_EPHYS
+#include <CommonLibHeader.h>
+#else
+#define COMMON_LIB
+#endif
+
+
 namespace RWSync
 {
-    class Manager
+    class COMMON_LIB Manager
     {
     public:
         explicit Manager(int maxReaders = 1);
@@ -30,7 +41,7 @@ namespace RWSync
         // input, does nothing.
         void ensureSpaceForReaders(int newMaxReaders);
 
-        class WriteIndex
+        class COMMON_LIB WriteIndex
         {
         public:
             explicit WriteIndex(Manager& o);
@@ -56,7 +67,7 @@ namespace RWSync
         };
 
 
-        class ReadIndex
+        class COMMON_LIB ReadIndex
         {
         public:
             explicit ReadIndex(Manager& o);                
@@ -99,7 +110,7 @@ namespace RWSync
         // Registers as a writer and maxReader readers, so no other reader or writer
         // can exist while it's held. Use to access all the underlying data without
         // conern for who has access to what, e.g. for updating settings, resizing, etc.
-        class Lockout
+        class COMMON_LIB Lockout
         {
         public:
             explicit Lockout(Manager& o);
@@ -151,6 +162,10 @@ namespace RWSync
         std::deque<std::atomic<int>> readersOf;
         // If readersOf[i] == -1, this indicates that it's being written to.
         // In other words, readersOf[writerIndex] == -1 (but readers should not access writerIndex directly).
+
+#ifdef OPEN_EPHYS
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Manager);
+#endif
     };
 
     using WriteIndex = Manager::WriteIndex;

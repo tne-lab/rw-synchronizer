@@ -139,17 +139,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\RWSyncContainer.h" />
-    <ClInclude Include="..\..\..\RWSyncManager.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\..\RWSyncContainer.ipp">
-      <FileType>Document</FileType>
-    </ClInclude>
-    <ClCompile Include="..\..\..\RWSyncManager.cpp" />
-  </ItemGroup>
-  <ItemGroup>
+    <ClCompile Include="..\..\..\RWSync\Source\RWSyncManager.cpp" />
     <ClCompile Include="Main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\RWSync\Source\RWSyncContainer.h" />
+    <ClInclude Include="..\..\..\RWSync\Source\RWSyncManager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\RWSync\Source\RWSyncContainer.ipp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

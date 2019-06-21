@@ -10,7 +10,7 @@
 #include <cstdio>
 #include <tchar.h>
 
-#include "../../../RWSyncContainer.h"
+#include "../../../RWSync/Source/RWSyncContainer.h"
 
 class NonCopyable
 {

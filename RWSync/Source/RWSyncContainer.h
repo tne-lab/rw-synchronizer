@@ -109,6 +109,11 @@ namespace RWSync
         std::unique_ptr<T> original; // as in "original copy"
 
         std::mutex dataSizeMutex;
+
+#ifdef OPEN_EPHYS
+    private:
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Container);
+#endif
     };
 
 

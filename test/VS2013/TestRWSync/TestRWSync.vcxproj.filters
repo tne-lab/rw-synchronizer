@@ -15,22 +15,24 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\RWSyncManager.h">
+    <ClCompile Include="Main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\RWSync\Source\RWSyncManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\RWSync\Source\RWSyncContainer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\RWSyncContainer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\RWSyncContainer.ipp">
+    <ClInclude Include="..\..\..\RWSync\Source\RWSyncManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\RWSyncManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
+    <None Include="..\..\..\RWSync\Source\RWSyncContainer.ipp">
+      <Filter>Header Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

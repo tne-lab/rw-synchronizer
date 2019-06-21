@@ -11,12 +11,22 @@ N + 2 instances. During operation, "pushing" from the writer and "pulling" to a 
 are accomplished by exchanging atomic indices between slots indicating what each instance
 is to be used for, rather than any actual copying or allocation.
 
+## Installation
+
+The library is only 4 files in a flat structure: two headers, a "template implementation" header,
+and a C++ implementation file. These only use the C++11 standard library and can be easily
+incorporated in various projects.
+
+There is also a CMake build file to create a common library for the [Open Ephys GUI](https://open-ephys.atlassian.net/wiki/spaces/OEW/pages/491527/Open+Ephys+GUI) under `RWSync/OpenEphysCMakeBuild`. (See: [Plugin CMake Builds](https://open-ephys.atlassian.net/wiki/spaces/OEW/pages/1259110401/Plugin+CMake+Builds))
+
+## Usage
+
 You can either use a **container**, which manages the construction and destruction of all
 data instances along with the synchronization logic and gives you pointers to write to
 and read from, or a **manager**, which just does the sync logic and gives you an index
 to use when accessing your own data structures.
 
-## Container interface
+### Container interface
 
  * There are two constructible subclasses of the abstract `Container` class:
 
@@ -79,7 +89,7 @@ to use when accessing your own data structures.
    from the writer that has not been read by this reader yet. After a call to `hasUpdate()` returns
    true, the current read ptr is guaranteed to be readable after calling `pullUpdate()`.
 
-## Manager interface
+### Manager interface
 
  * An `RWSync::Manager` directly works similarly to a container; the main difference is 
    that you are responsible for allocating and accessing the data, and the Manager just
