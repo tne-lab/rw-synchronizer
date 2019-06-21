@@ -11,102 +11,47 @@
 namespace RWSync
 {
     template<typename T>
-    template<typename... Args>
-    Container<T>::Container(const Args&... args)
-        : manager       (new Manager())
-        , dataSizeMutex (new std::mutex())
-        , original      (new T(args...))
+    int Container<T>::numAllocatedReaders() const
     {
-        data.reserve(3);
-        for (int i = 0; i < 3; ++i)
-        {
-            data.emplace_back(new T(args...));
-        }
-    }
-
-
-    template<typename T>
-    template<int maxReaders, typename... Args>
-    Container<T> Container<T>::createWithMaxReaders(const Args&... args)
-    {
-        Container<T> container(args...);
-        container.manager->ensureSpaceForReaders(maxReaders);
-
-        // add additional copies
-        container.data.reserve(maxReaders + 2);
-        for (int i = 1; i < maxReaders; ++i)
-        {
-            container.data.emplace_back(new T(args...));
-        }
-
-        return container; // moves (or constructs in place with RVO)
-    }
-
-
-    template<typename T>
-    Container<T>::Container(Container<T>&& other)
-    {
-        *this = std::move(other);
-    }
-
-
-    template<typename T>
-    Container<T>& Container<T>::operator=(Container<T>&& other)
-    {
-        if (this != &other)
-        {
-            manager         = std::move(other.manager);
-            data            = std::move(other.data);
-            dataSizeMutex   = std::move(other.dataSizeMutex);
-            original        = std::move(other.original);
-        }
-        return *this;
-    }
-
-
-    template<typename T>
-    int Container<T>::getMaxReaders() const
-    {
-        return manager->getMaxReaders();
+        return manager.getMaxReaders();
     }
 
 
     template<typename T>
     void Container<T>::increaseMaxReadersTo(int nReaders)
     {
-        static_assert(canExpand, "Only Containers of copy-constructible types can be expanded");
+        assert(original != nullptr); // original should be assigned in constructor if expandable
 
         // step 1: ensure space in data
-        std::lock_guard<std::mutex> dataSizeLock(*dataSizeMutex);
+        std::lock_guard<std::mutex> dataSizeLock(dataSizeMutex);
         int newElementsNeeded = nReaders + 2 - data.size();
         for (int i = 0; i < newElementsNeeded; ++i)
         {
-            data.emplace_back(new T(*original));
+            data.push_back(*original);
         }
 
-        // step 2: allow more readers in manager manager
-        manager->ensureSpaceForReaders(nReaders);
+        // step 2: allow more readers in manager
+        manager.ensureSpaceForReaders(nReaders);
     }
-
 
     template<typename T>
     bool Container<T>::reset()
     {
-        return manager->reset();
+        return manager.reset();
     }
 
-
     template<typename T>
-    bool Container<T>::map(std::function<void(T&)> f)
+    template<typename UnaryOperator>
+    bool Container<T>::map(UnaryOperator f)
     {
-        Manager::Lockout lock(*manager);
+        Manager::Lockout lock(manager);
         if (!lock.isValid())
         {
             return false;
         }
 
-        std::unique_lock<std::mutex> dataSizeLock(*dataSizeMutex, std::defer_lock);
-        if (canExpand)
+        std::unique_lock<std::mutex> dataSizeLock(dataSizeMutex, std::defer_lock);
+        if (expandable)
         {
             // make sure we don't start expanding "data" while this is happening
             dataSizeLock.lock();
@@ -116,9 +61,9 @@ namespace RWSync
             f(*original);
         }
 
-        for (std::unique_ptr<T>& instance : data)
+        for (T& instance : data)
         {
-            f(*instance);
+            f(instance);
         }
 
         return true;
@@ -128,7 +73,7 @@ namespace RWSync
     template<typename T>
     Container<T>::WritePtr::WritePtr(Container<T>& o)
         : owner (o)
-        , ind   (*o.manager)
+        , ind   (o.manager)
     {}
 
 
@@ -175,7 +120,7 @@ namespace RWSync
     template<typename T>
     Container<T>::ReadPtr::ReadPtr(Container<T>& o)
         : owner (o)
-        , ind   (*o.manager)
+        , ind   (o.manager)
     {}
 
 
@@ -232,14 +177,61 @@ namespace RWSync
         return owner.data[ind];
     }
 
+    template<typename T>
+    template<typename... Args>
+    Container<T>::Container(int maxReaders, Args&&... args)
+        : expandable    (maxReaders == 0)
+        , manager       (expandable ? 1 : maxReaders)
+    {
+        assert(maxReaders >= 0);
+
+        if (expandable)
+        {
+            original.reset(new T(args...));
+        }
+
+        int initialCopies = manager.getMaxReaders() + 2;
+
+        for (int i = 0; i < initialCopies - 1; ++i)
+        {
+            data.emplace_back(args...);
+        }
+
+        // move into last entry if possible
+        data.emplace_back(std::forward<Args>(args)...);
+    }
+
+    template<typename T, int maxReaders>
+    template<typename... Args>
+    FixedContainer<T, maxReaders>::FixedContainer(Args&&... args)
+        : Container<T>(maxReaders, std::forward<Args>(args)...)
+    {
+        static_assert(maxReaders >= 1, "Maximum readers of FixedContainer must be at least 1");
+    }
 
     template<typename T>
-    Container<T>::GuaranteedReadPtr::GuaranteedReadPtr(Container<T>& o)
-        : ReadPtr(o)
+    template<typename... Args>
+    ExpandableContainer<T>::ExpandableContainer(Args&&... args)
+        : Container<T>(0, std::forward<Args>(args)...)
+    {
+        // is_copy_constructible is broken on VS2013, sadly...
+        static_assert(std::is_copy_constructible<T>::value,
+            "An ExpandableContainer cannot be created of a non-copyable type.");
+    }
+
+    template<typename T>
+    void ExpandableContainer<T>::increaseMaxReadersTo(int nReaders)
+    {
+        Container<T>::increaseMaxReadersTo(nReaders);
+    }
+
+    template<typename T>
+    ExpandableContainer<T>::GuaranteedReadPtr::GuaranteedReadPtr(ExpandableContainer<T>& o)
+        : Container<T>::ReadPtr(o)
     {
         while (!tryToMakeValid())
         {
-            o.increaseMaxReadersTo(o.getMaxReaders() + 1);
+            o.increaseMaxReadersTo(o.numAllocatedReaders() + 1);
         }        
     }
 }

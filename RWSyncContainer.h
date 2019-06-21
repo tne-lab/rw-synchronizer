@@ -21,31 +21,14 @@
 
 namespace RWSync
 {
-    // Container that could have either fixed or dynamic size
+    // Abstract base class that isn't a template over maxReaders
+    // and thus has an ugly constructor signature
     template<typename T>
     class Container
     {
     public:
-        // Creates a container with one reader, initializing each
-        // data instance with the given arguments. If T is copyable,
-        // can be expanded to allow more readers by calling
-        // increaseMaxReadersTo.
-        template<typename... Args>
-        Container(const Args&... args);
+        int numAllocatedReaders() const;
 
-        // Factory for fixed-size container with more than one reader
-        template<int maxReaders, typename... Args>
-        static Container<T> createWithMaxReaders(const Args&... args);
-
-        // = default doesn't work for these in VS2013
-        Container(Container<T>&& other);
-        Container<T>& operator=(Container<T>&& other);
-
-        int getMaxReaders() const;
-
-        // Requires that T is copy-constructible.
-        void increaseMaxReadersTo(int nReaders);
-        
         // Reset to state where no writes have been made.
         // Requires that no readers or writers exist. Returns false if
         // this condition is unmet, true otherwise.
@@ -54,7 +37,11 @@ namespace RWSync
         // Call a function on each underlying data member.
         // Requires that no readers or writers exist. Returns false if
         // this condition is unmet, true otherwise.
-        bool map(std::function<void(T&)> f);
+        //
+        // UnaryOperator should be convertible to std::function<void(T&)>.
+        // Using a template instead minimizes runtime cost.
+        template<typename UnaryOperator>
+        bool map(UnaryOperator f);
 
         class WritePtr
         {
@@ -107,31 +94,63 @@ namespace RWSync
             ReadIndex ind;
         };
 
+    protected:
+        template<typename... Args>
+        Container(int maxReaders, Args&&... args);
+
+        // Requires that T is copy-constructible.
+        void increaseMaxReadersTo(int nReaders);
+
+        const bool expandable;
+
+        Manager manager;
+
+        std::deque<T> data;
+        std::unique_ptr<T> original; // as in "original copy"
+
+        std::mutex dataSizeMutex;
+    };
+
+
+    // Container with fixed size
+    template<typename T, int maxReaders = 1>
+    class FixedContainer : public Container<T>
+    {
+    public:
+        // Creates a container that allows maxReaders readers, initializing each
+        // data instance with the given arguments.
+        template<typename... Args>
+        FixedContainer(Args&&... args);        
+    };
+
+    template<typename T>
+    class ExpandableContainer : public Container<T>
+    {
+    public:
+        // Creates a container that allows one reader but can be expanded.
+        // Use increaseMaxReadersTo() to pre-allocate the number of readers that
+        // will be needed, or use a GuaranteedReadPtr to do so automatically when needed.
+        template<typename... Args>
+        ExpandableContainer(Args&&... args);
+
+        void increaseMaxReadersTo(int nReaders);
+
         // Only for copy-constructible T
-        class GuaranteedReadPtr : public ReadPtr
+        class GuaranteedReadPtr : public Container<T>::ReadPtr
         {
         public:
+
             // Makes sure there is space for
             // this read pointer by increasing the max # of readers
             // if necessary. Note that the pointer could still be
             // not ready for reading if nothing has been written yet,
             // so checking isValid is still necessary.
-            explicit GuaranteedReadPtr(Container<T>& o);
+            explicit GuaranteedReadPtr(ExpandableContainer<T>& o);
         };
-
-    private:
-        // unique pointers are to make sure we can move
-
-        std::unique_ptr<Manager> manager;
-
-        std::vector<std::unique_ptr<T>> data;
-        std::unique_ptr<std::mutex> dataSizeMutex;
-
-        std::unique_ptr<T> original; // as in "original copy"
-
-        static const bool canExpand = std::is_copy_constructible<T>::value;
     };
 
+
+    // for convenience:
     template<typename T>
     using WritePtr = typename Container<T>::WritePtr;
 
@@ -139,7 +158,7 @@ namespace RWSync
     using ReadPtr = typename Container<T>::ReadPtr;
 
     template<typename T>
-    using GuaranteedReadPtr = typename Container<T>::GuaranteedReadPtr;
+    using GuaranteedReadPtr = typename ExpandableContainer<T>::GuaranteedReadPtr;
 }
 
 #include "RWSyncContainer.ipp"

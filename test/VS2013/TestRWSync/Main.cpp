@@ -4,7 +4,10 @@
 *  See attached LICENSE file for more details, or https://opensource.org/licenses/MIT.
 */
 
+// TODO: Make a more commprehensive series of tests!
+
 #include <iostream>
+#include <cstdio>
 #include <tchar.h>
 
 #include "../../../RWSyncContainer.h"
@@ -20,44 +23,51 @@ private:
     int a;
 };
 
-static RWSync::Container<int> syncedInt(0);
+static RWSync::ExpandableContainer<int> syncedInt(0);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-    std::cout << "Max readers is now " << syncedInt.getMaxReaders() << std::endl;
+    std::cout << "Container initialized with 1 reader and value 0" << std::endl;
+    std::cout << "Allocated readers is now " << syncedInt.numAllocatedReaders() << std::endl;
 
+    // Test manually expanding # of readers
+    std::cout << "Increasing max readers to 3" << std::endl;
     syncedInt.increaseMaxReadersTo(3);
 
-    std::cout << "Max readers is now " << syncedInt.getMaxReaders() << std::endl;
+    std::cout << "Allocated readers is now " << syncedInt.numAllocatedReaders() << std::endl;
 
+    std::cout << "Incrementing each instance of data by 1" << std::endl;
     syncedInt.map([](int& data){ data++; });
 
-    int i = 0;
+    std::cout << "There should be 6 instances of data: 3 readers, 2 extra, plus the 'original' "
+        "for creating new copies." << std::endl;
+    int i = 1;
     syncedInt.map([&](int& data)
     {
         std::cout << "Data " << i << " = " << data << std::endl;
         ++i;
     });
 
+    // Test dynamically expanding # of readers
+    std::cout << "Checking out 4 readers, which should increase the size by 1" << std::endl;
     std::deque<RWSync::GuaranteedReadPtr<int>> readers;
     for (int i = 0; i < 4; ++i)
     {
         readers.emplace_back(syncedInt);
     }
 
-    std::cout << "Max readers is now " << syncedInt.getMaxReaders() << std::endl;
+    std::cout << "Allocated readers is now " << syncedInt.numAllocatedReaders() << std::endl;
 
-    std::cout << "Press Ctrl-C to exit." << std::endl;
+    std::cout << "Press Enter to exit." << std::endl;
 
-    char c;
-    std::cin >> c;
+    getchar();
 
     // this should not compile:
-    // RWSync::Container<NonCopyable> badContainer(0);
+    // RWSync::ExpandableContainer<NonCopyable> badContainer(0);
     // badContainer.increaseMaxReadersTo(2);
 
     // this should work:
-    auto goodContainer = RWSync::Container<NonCopyable>::createWithMaxReaders<2>(0);
+    RWSync::FixedContainer<NonCopyable, 2> goodContainer(0);
 
     return 0;
 }
