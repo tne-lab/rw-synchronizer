@@ -101,6 +101,7 @@ namespace RWSync
         // Requires that T is copy-constructible.
         void increaseMaxReadersTo(int nReaders);
 
+    private:
         const bool expandable;
 
         Manager manager;
@@ -111,7 +112,6 @@ namespace RWSync
         std::mutex dataSizeMutex;
 
 #ifdef OPEN_EPHYS
-    private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Container);
 #endif
     };
