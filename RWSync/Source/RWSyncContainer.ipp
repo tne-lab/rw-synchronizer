@@ -229,7 +229,7 @@ namespace RWSync
     ExpandableContainer<T>::GuaranteedReadPtr::GuaranteedReadPtr(ExpandableContainer<T>& o)
         : Container<T>::ReadPtr(o)
     {
-        while (!tryToMakeValid())
+        while (!this->tryToMakeValid())
         {
             o.increaseMaxReadersTo(o.numAllocatedReaders() + 1);
         }        
