@@ -33,7 +33,9 @@ to use when accessing your own data structures.
      * `RWSync::FixedContainer<T, N=1>` if you have fixed number of maximum readers `N`;
      * `RWSync::ResizableContainer<T>` if the number of maximum readers is unknown.
 
-   Here, T is the type of data that needs to be exchanged.
+   Here, T is the type of data that needs to be exchanged. A `ResizableContainer<T>` can
+   only be created if T is copy-constructible, since new data instances to support
+   additional readers have to be copied from a template.
 
  * The constructor either type of container takes whatever arguments
    would be used to construct each `T` object, for instance:
