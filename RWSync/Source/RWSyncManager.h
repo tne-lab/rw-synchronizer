@@ -27,12 +27,17 @@ namespace RWSync
     class COMMON_LIB Manager
     {
     public:
+        class Lockout;
+
         explicit Manager(int maxReaders = 1);
 
         // Reset to state with no valid object
         // No readers or writers should be active when this is called!
         // If it does fail due to existing readers or writers, returns false
         bool reset();
+
+        // Use this call if you already have a valid Lockout for doing other operations
+        bool reset(const Lockout& existingLock);
 
         int getMaxReaders() const;
 
@@ -117,6 +122,8 @@ namespace RWSync
             ~Lockout();
 
             bool isValid() const;
+
+            bool isValidForManager(const Manager* expected) const;
 
         private:
             Manager& owner;

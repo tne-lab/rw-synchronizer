@@ -33,7 +33,13 @@ namespace RWSync
     bool Manager::reset()
     {
         Lockout lock(*this);
-        if (!lock.isValid())
+        return reset(lock);
+    }
+
+
+    bool Manager::reset(const Lockout& existingLock)
+    {
+        if (!existingLock.isValidForManager(this))
         {
             return false;
         }
@@ -399,5 +405,11 @@ namespace RWSync
     bool Manager::Lockout::isValid() const
     {
         return valid;
+    }
+
+
+    bool Manager::Lockout::isValidForManager(const Manager* expected) const
+    {
+        return valid && expected == &owner;
     }
 }

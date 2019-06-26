@@ -45,7 +45,7 @@ namespace RWSync
     bool Container<T>::map(UnaryOperator f)
     {
         Manager::Lockout lock(manager);
-        if (!lock.isValid())
+        if (!manager.reset(lock))
         {
             return false;
         }
@@ -92,14 +92,7 @@ namespace RWSync
 
 
     template<typename T>
-    T& Container<T>::WritePtr::operator*()
-    {
-        return *(operator->());
-    }
-
-    
-    template<typename T>
-    T* Container<T>::WritePtr::operator->()
+    Container<T>::WritePtr::operator T*()
     {
         if (!ind.isValid())
         {
@@ -107,6 +100,19 @@ namespace RWSync
         }
 
         return owner.data[ind];
+    }
+
+    template<typename T>
+    T& Container<T>::WritePtr::operator*()
+    {
+        return **this;
+    }
+
+    
+    template<typename T>
+    T* Container<T>::WritePtr::operator->()
+    {
+        return *this;
     }
 
 
@@ -160,14 +166,7 @@ namespace RWSync
 
 
     template<typename T>
-    const T& Container<T>::ReadPtr::operator*()
-    {
-        return *(operator->());
-    }
-
-
-    template<typename T>
-    const T* Container<T>::ReadPtr::operator->()
+    Container<T>::ReadPtr::operator T*()
     {
         if (!canRead())
         {
@@ -176,6 +175,20 @@ namespace RWSync
 
         return owner.data[ind];
     }
+
+    template<typename T>
+    T& Container<T>::ReadPtr::operator*()
+    {
+        return **this;
+    }
+
+
+    template<typename T>
+    T* Container<T>::ReadPtr::operator->()
+    {
+        return *this;
+    }
+
 
     template<typename T>
     template<typename... Args>

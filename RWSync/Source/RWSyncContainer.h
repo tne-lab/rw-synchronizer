@@ -38,6 +38,9 @@ namespace RWSync
         // Requires that no readers or writers exist. Returns false if
         // this condition is unmet, true otherwise.
         //
+        // Also does a reset, since we assume any previous writes
+        // are no longer valid after the map.
+        //
         // UnaryOperator should be convertible to std::function<void(T&)>.
         // Using a template instead minimizes runtime cost.
         template<typename UnaryOperator>
@@ -54,6 +57,7 @@ namespace RWSync
             bool isValid() const;
 
             // provide access to data
+            operator T*();
             T& operator*();
             T* operator->();
 
@@ -86,8 +90,9 @@ namespace RWSync
             void pullUpdate();
 
             // provide access to data
-            const T& operator*();
-            const T* operator->();
+            operator T*();
+            T& operator*();
+            T* operator->();
 
         private:
             Container<T>& owner;
