@@ -99,7 +99,7 @@ namespace RWSync
             return nullptr;
         }
 
-        return owner.data[ind];
+        return &owner.data[ind];
     }
 
     template<typename T>
@@ -173,7 +173,7 @@ namespace RWSync
             return nullptr;
         }
 
-        return owner.data[ind];
+        return &owner.data[ind];
     }
 
     template<typename T>
