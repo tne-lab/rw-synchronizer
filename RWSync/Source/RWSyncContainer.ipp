@@ -35,9 +35,9 @@ namespace RWSync
     }
 
     template<typename T>
-    bool Container<T>::reset()
+    void Container<T>::reset()
     {
-        return manager.reset();
+        manager.reset();
     }
 
     template<typename T>
@@ -96,7 +96,7 @@ namespace RWSync
     {
         if (!ind.isValid())
         {
-            throw new std::out_of_range("Attempt to access an invalid write pointer");
+            return nullptr;
         }
 
         return owner.data[ind];
@@ -170,7 +170,7 @@ namespace RWSync
     {
         if (!canRead())
         {
-            throw new std::out_of_range("Attempt to access an invalid read pointer");
+            return nullptr;
         }
 
         return owner.data[ind];

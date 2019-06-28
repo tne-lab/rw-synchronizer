@@ -30,9 +30,8 @@ namespace RWSync
         int numAllocatedReaders() const;
 
         // Reset to state where no writes have been made.
-        // Requires that no readers or writers exist. Returns false if
-        // this condition is unmet, true otherwise.
-        bool reset();
+        // Can be called at any time.
+        void reset();
 
         // Call a function on each underlying data member.
         // Requires that no readers or writers exist. Returns false if

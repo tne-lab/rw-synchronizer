@@ -16,45 +16,28 @@ namespace RWSync
     ////// Manager ///////
 
     Manager::Manager(int maxReaders)
-        : nReaders(0)
-        , nWriters(0)
+        : nReaders      (0)
+        , nWriters      (0)
+        , writerIndex   (0)
+        , latest        (-1)
     {
         if (maxReaders < 1 || maxReaders > INT_MAX - 2)
         {
             throw new std::domain_error("Max readers must be in range [1, INT_MAX - 2]");
         }
 
-        readersOf.resize(maxReaders + 2);
-
-        reset();
-    }
-
-
-    bool Manager::reset()
-    {
-        Lockout lock(*this);
-        return reset(lock);
-    }
-
-
-    bool Manager::reset(const Lockout& existingLock)
-    {
-        if (!existingLock.isValidForManager(this))
+        // writer index has readersOf = -1
+        readersOf.emplace_back(-1);
+        for (int i = 1; i < maxReaders + 2; ++i)
         {
-            return false;
+            readersOf.emplace_back(0);
         }
+    }
 
-        writerIndex = 0;
+
+    void Manager::reset()
+    {
         latest.store(-1, std::memory_order_relaxed);
-
-        int currSize = readersOf.size();
-        for (int i = 1; i < currSize; ++i)
-        {
-            readersOf[i].store(0, std::memory_order_relaxed);
-        }
-        readersOf[0].store(-1, std::memory_order_release);
-
-        return true;
     }
 
 
@@ -302,7 +285,7 @@ namespace RWSync
     bool ReadIndex::hasUpdate() const
     {
         int newLatest = owner.latest.load(std::memory_order_relaxed);
-        return valid && newLatest != -1 && newLatest != index;
+        return valid && newLatest != index;
         // even if the latest is different by the time it's pulled, it won't be
         // the one that this reader is currently reading.
     }

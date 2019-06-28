@@ -31,13 +31,9 @@ namespace RWSync
 
         explicit Manager(int maxReaders = 1);
 
-        // Reset to state with no valid object
-        // No readers or writers should be active when this is called!
-        // If it does fail due to existing readers or writers, returns false
-        bool reset();
-
-        // Use this call if you already have a valid Lockout for doing other operations
-        bool reset(const Lockout& existingLock);
+        // Reset to state with no valid object (readers will see this as an update)
+        // Can be called at any time.
+        void reset();
 
         int getMaxReaders() const;
 
